@@ -1,40 +1,103 @@
-import React, { useState, useMemo } from 'react';
-import { Search, Award, TrendingUp } from 'lucide-react';
+'use client';
+
+import React, { useState, useMemo, useEffect } from 'react';
+import { Search, Award, TrendingUp, Upload } from 'lucide-react';
 import { RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer, Legend } from 'recharts';
 
 const StudentDashboard = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStudent, setSelectedStudent] = useState(null);
+  const [studentsData, setStudentsData] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // PASTE YOUR CSV DATA HERE - Just copy all rows from Excel/Sheets
-  const csvData = `10/17/2025 19:56:13,simransahoo.95@gmail.com,Simran Sahoo,Aryan Choksi,4 - Good,5 - Excellent,3 - Average,4 - Good,4 - Good,4 - Good,Average - Needs practice in key areas,Aryan has a good and go to attitude that makes him seem like a goal oriented person. A good quality to have in the corporate. There is a need to work on structuring the answers and having clarity of thought.
-10/17/2025 20:01:19,simransahoo.95@gmail.com,Simran Sahoo,Akansha Marwah,4 - Good,4 - Good,3 - Average,3 - Average,3 - Average,4 - Good,Average - Needs practice in key areas,Akansha has got content but needs to know how to sell it. Being in the IMCC, her own CV cannot have flaws which need to be looked into. Subject matter knowledge needs to be brushed upon not a strong forte as of now. A lot of fillers are being used while speaking making her sound verbose.`;
+  // Fetch CSV data from public folder on component mount
+  useEffect(() => {
+    const loadCSV = async () => {
+      try {
+        const response = await fetch('/data.csv');
+        const csvText = await response.text();
+        const parsed = parseCSV(csvText);
+        setStudentsData(parsed);
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Error loading CSV:', error);
+        // Fallback to sample data if CSV not found
+        setStudentsData(getSampleData());
+        setIsLoading(false);
+      }
+    };
 
-  // Parse CSV and convert to data
+    loadCSV();
+  }, []);
+
+  // Parse rating string to number
   const parseRating = (ratingStr) => {
-    const match = ratingStr.match(/^(\d+)/);
+    if (!ratingStr) return 3;
+    const match = ratingStr.toString().match(/^(\d+)/);
     return match ? parseInt(match[1]) : 3;
   };
 
-  const studentsData = useMemo(() => {
-    return csvData.trim().split('\n').map(row => {
-      const cols = row.split(',');
+  // Parse CSV text to data array
+  const parseCSV = (csvText) => {
+    const lines = csvText.trim().split('\n');
+    // Skip header row
+    const dataLines = lines.slice(1);
+    
+    return dataLines.map(line => {
+      // Handle commas within quotes
+      const cols = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || [];
+      const cleanCols = cols.map(col => col.replace(/^"|"$/g, '').trim());
+      
       return {
-        timestamp: cols[0],
-        email: cols[1],
-        panelistName: cols[2],
-        studentName: cols[3],
-        communication: parseRating(cols[4]),
-        bodyLanguage: parseRating(cols[5]),
-        domainKnowledge: parseRating(cols[6]),
-        analyticalThinking: parseRating(cols[7]),
-        leadership: parseRating(cols[8]),
-        culturalFit: parseRating(cols[9]),
-        overall: cols[10],
-        feedback: cols.slice(11).join(',')
+        timestamp: cleanCols[0] || '',
+        email: cleanCols[1] || '',
+        panelistName: cleanCols[2] || '',
+        studentName: cleanCols[3] || '',
+        communication: parseRating(cleanCols[4]),
+        bodyLanguage: parseRating(cleanCols[5]),
+        domainKnowledge: parseRating(cleanCols[6]),
+        analyticalThinking: parseRating(cleanCols[7]),
+        leadership: parseRating(cleanCols[8]),
+        culturalFit: parseRating(cleanCols[9]),
+        overall: cleanCols[10] || '',
+        feedback: cleanCols.slice(11).join(' ')
       };
     });
-  }, [csvData]);
+  };
+
+  // Sample data fallback
+  const getSampleData = () => {
+    return [
+      {
+        timestamp: "10/17/2025 19:56:13",
+        email: "simransahoo.95@gmail.com",
+        panelistName: "Simran Sahoo",
+        studentName: "Aryan Choksi",
+        communication: 4,
+        bodyLanguage: 5,
+        domainKnowledge: 3,
+        analyticalThinking: 4,
+        leadership: 4,
+        culturalFit: 4,
+        overall: "Average - Needs practice in key areas",
+        feedback: "Aryan has a good and go to attitude that makes him seem like a goal oriented person. A good quality to have in the corporate. There is a need to work on structuring the answers and having clarity of thought."
+      },
+      {
+        timestamp: "10/17/2025 20:01:19",
+        email: "simransahoo.95@gmail.com",
+        panelistName: "Simran Sahoo",
+        studentName: "Akansha Marwah",
+        communication: 4,
+        bodyLanguage: 4,
+        domainKnowledge: 3,
+        analyticalThinking: 3,
+        leadership: 3,
+        culturalFit: 4,
+        overall: "Average - Needs practice in key areas",
+        feedback: "Akansha has got content but needs to know how to sell it. Being in the IMCC, her own CV cannot have flaws which need to be looked into. Subject matter knowledge needs to be brushed upon not a strong forte as of now. A lot of fillers are being used while speaking making her sound verbose."
+      }
+    ];
+  };
 
   const filteredStudents = useMemo(() => {
     if (!searchTerm) return [];
@@ -70,6 +133,17 @@ const StudentDashboard = () => {
     setSelectedStudent(student);
     setSearchTerm('');
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading student data...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
